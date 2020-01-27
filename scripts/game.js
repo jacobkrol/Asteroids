@@ -1,6 +1,8 @@
 window.onload = function() {
 	canv = document.getElementById('gc');
 	ctx = canv.getContext('2d');
+	document.addEventListener('keydown', handle_key_down);
+	document.addEventListener('keyup', handle_key_up);
 	const fps = 50;
 	setup();
 	game = setInterval(main, 1000/fps);
@@ -41,6 +43,15 @@ class Player {
 		ctx.closePath();
 		ctx.resetTransform();
 	}
+
+	move(dir) {
+		console.log("move in direction",dir);
+
+	}
+
+	shoot() {
+		console.log("pew");
+	}
 }
 
 class Space {
@@ -61,4 +72,31 @@ class Space {
 function main() {
 	space.show();
 	player.show();
+}
+
+function handle_key_down(evt) {
+	switch(evt.code) {
+		case 'ArrowUp':
+			player.move(0);
+			break;
+		case 'ArrowRight':
+			player.move(1);
+			break;
+		case 'ArrowDown':
+			player.move(2);
+			break;
+		case 'ArrowLeft':
+			player.move(3);
+			break;
+		case 'Space':
+			player.shoot();
+			break;
+		default:
+			console.log("invalid key press");
+			break;
+	}
+}
+
+function handle_key_up(evt) {
+	// console.log(evt,"key up");
 }
