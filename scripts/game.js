@@ -141,9 +141,29 @@ class Space {
 	}
 
 	update() {
-		this.lasers.forEach((l) => l.update());
+		this.lasers.forEach((l) => {
+			l.update();
+			this.asteroids.forEach((a) => {
+				if(l.hit(a)) {
+					for(let i=0; i<Math.random()*3+1; i++) {
+						this.asteroids.push(new Asteroid(a.pos.x,a.pos.y,a.r*0.75));
+					}
+					a.hit = true;
+					l.used = true;
+					console.log(this.asteroids.indexOf(a));
+				}
+			});
+			this.lasers = this.lasers.slice().filter((l) => !l.used);
+			this.asteroids = this.asteroids.slice().filter((a) => !a.hit);
+		});
 		if(this.lasers.length > 30) { this.lasers.unshift() }
-		this.asteroids.forEach((a) => a.update());
+		this.asteroids.forEach((a) => {
+			a.update();
+			if(a.hit) {
+
+			}
+		});
+		this.asteroids = this.asteroids.filter((a) => !a.hit);
 		if(Math.random() < 0.01) {
 			this.asteroids.push(new Asteroid());
 		}
@@ -166,12 +186,18 @@ class Laser {
 		};
 		this.angle = a;
 		this.size = 10;
+		this.used = false;
 	}
 
 	update() {
 		const speed = 3;
 		this.pos.x += speed*Math.cos(this.angle);
 		this.pos.y += speed*Math.sin(this.angle);
+	}
+
+	hit(a) { // asteroid object
+		const d = Math.sqrt(sq(this.pos.x - a.pos.x) + sq(this.pos.y - a.pos.y));
+		return d < this.size+a.r;
 	}
 
 	show() {
@@ -188,14 +214,15 @@ class Laser {
 }
 
 class Asteroid {
-	constructor() {
+	constructor(_x,_y,_r) {
 		this.pos = {
-			x: Math.random()*space.width,
-			y: Math.random()*space.height
+			x: _x ||Math.random()*space.width,
+			y: _y || Math.random()*space.height
 		};
-		this.r = Math.random()*25+8;
+		this.r = _r || Math.random()*25+8;
 		this.speed = Math.random()*1+0.1;
 		this.angle = Math.random()*2*Math.PI;
+		this.hit = false;
 	}
 
 	update() {
@@ -203,7 +230,12 @@ class Asteroid {
 		this.pos.y += this.speed * Math.sin(this.angle);
 	}
 
+	explode() {
+		this.hit = true;
+	}
+
 	show() {
+		ctx.strokeStyle = this.hit ? "red" : "white";
 		ctx.translate(this.pos.x,this.pos.y);
 		// ctx.rotate(this.angle+Math.PI/2);
 		ctx.beginPath();
