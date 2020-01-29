@@ -1,6 +1,8 @@
 window.onload = function() {
 	canv = document.getElementById('gc');
 	ctx = canv.getContext('2d');
+	canv.width = Math.min(window.innerHeight,window.innerWidth)-30;
+	canv.height = Math.min(window.innerHeight,window.innerWidth)-30;
 	document.addEventListener('keydown', handle_key_down);
 	document.addEventListener('keyup', handle_key_up);
 	const fps = 50;
@@ -142,6 +144,9 @@ class Space {
 		this.lasers.forEach((l) => l.update());
 		if(this.lasers.length > 30) { this.lasers.unshift() }
 		this.asteroids.forEach((a) => a.update());
+		if(Math.random() < 0.01) {
+			this.asteroids.push(new Asteroid());
+		}
 	}
 
 	show() {
@@ -188,12 +193,14 @@ class Asteroid {
 			x: Math.random()*space.width,
 			y: Math.random()*space.height
 		};
-		this.r = Math.random()*25+5;
-		this.vel = {
-			x:0,
-			y:0
-		};
+		this.r = Math.random()*25+8;
+		this.speed = Math.random()*1+0.1;
 		this.angle = Math.random()*2*Math.PI;
+	}
+
+	update() {
+		this.pos.x += this.speed * Math.cos(this.angle);
+		this.pos.y += this.speed * Math.sin(this.angle);
 	}
 
 	show() {
