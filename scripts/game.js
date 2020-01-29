@@ -145,8 +145,11 @@ class Space {
 			l.update();
 			this.asteroids.forEach((a) => {
 				if(l.hit(a)) {
-					for(let i=0; i<Math.random()*3+1; i++) {
-						this.asteroids.push(new Asteroid(a.pos.x,a.pos.y,a.r*0.75));
+					if(a.r > 8) {
+						for(let i=0; i<Math.random()*3+1; i++) {
+							const r = a.r*(Math.random()*0.55+0.2);
+							this.asteroids.push(new Asteroid(a.pos.x,a.pos.y,r));
+						}
 					}
 					a.hit = true;
 					l.used = true;
