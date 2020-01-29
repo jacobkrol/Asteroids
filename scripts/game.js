@@ -10,6 +10,7 @@ window.onload = function() {
 
 function setup() {
 	player = new Player();
+	player.r = Math.max(player.width,player.height)/2;
 	space = new Space();
 }
 
@@ -21,32 +22,91 @@ class Player {
 		};
 		this.width = 20;
 		this.height = 25;
+		this.r = 0;
 		this.angle = 0;
 		this.vel = {
 			x: 0,
 			y: 0
 		};
+		this.copies = [];
+		this.lastUpdate = performance.now();
+		this.delay = 10;
+		this.turning = 0;
+		this.thrusting = false;
+		this.shooting = false;
+	}
+
+	update() {
+		//turn the ship
+		const turnAngle = Math.PI/36;
+		this.angle += this.turning*turnAngle;
+
+		//thrust the ship
+		if(this.thrusting) {
+			const speedBoost = 0.1,
+				  maxSpeed = 5;
+			this.vel.x += speedBoost*Math.cos(this.angle);
+			this.vel.y += speedBoost*Math.sin(this.angle);
+			if(sq(this.vel.x)+sq(this.vel.y) > sq(maxSpeed)) {
+				const scale = maxSpeed / Math.sqrt(sq(this.vel.x)+sq(this.vel.y));
+				this.vel.x *= scale;
+				this.vel.y *= scale;
+			}
+		}
+
+		this.pos.x += this.vel.x;
+		this.pos.y += this.vel.y;
+		this.copies = [];
+		if(this.pos.y >= space.height-this.r) {
+			this.pos.y -= space.height;
+			if(this.pos.y <= this.r) {
+				this.copies.push(0);
+			}
+		}
+		if(this.pos.x >= space.width-this.r) {
+			this.pos.x -= space.width;
+			if(this.pos.x <= this.r) {
+				this.copies.push(1);
+			}
+		}
+		if(this.pos.y <= this.r) {
+			this.pos.y += space.height;
+			if(this.pos.y >= space.height-this.r) {
+				this.copies.push(2);
+			}
+		}
+		if(this.pos.x <= this.r) {
+			this.pos.x += space.width;
+			if(this.pos.x >= space.width-this.r) {
+				this.copies.push(3);
+			}
+		}
 	}
 
 	show() {
 		ctx.strokeStyle = "white";
 		ctx.lineWidth = "2";
-		ctx.lineJoin = "round";
-		ctx.rotate(this.angle);
-		ctx.beginPath();
-		ctx.moveTo(this.pos.x-this.width/2,this.pos.y+this.height/2);
-		ctx.lineTo(this.pos.x,this.pos.y-this.height/2);
-		ctx.lineTo(this.pos.x+this.width/2,this.pos.y+this.height/2);
-		ctx.lineTo(this.pos.x,this.pos.y+this.height/4);
-		ctx.lineTo(this.pos.x-this.width/2,this.pos.y+this.height/2);
-		ctx.stroke();
-		ctx.closePath();
-		ctx.resetTransform();
-	}
-
-	move(dir) {
-		console.log("move in direction",dir);
-
+		ctx.lineJoin = "bevel";
+		show_player_at(this.pos.x,this.pos.y);
+		for(let c of this.copies) {
+			switch(c) {
+				case 0:
+					show_player_at(this.pos.x,this.pos.y-space.height);
+					break;
+				case 1:
+					show_player_at(this.pos.x+space.width,this.pos.y);
+					break;
+				case 2:
+					show_player_at(this.pos.x,this.pos.y+space.height);
+					break;
+				case 3:
+					show_player_at(this.pos.x-space.width,this.pos.y);
+					break;
+				default:
+					console.log("unrecognized copy side");
+					break;
+			}
+		}
 	}
 
 	shoot() {
@@ -54,42 +114,128 @@ class Player {
 	}
 }
 
+function show_player_at(x,y) {
+	ctx.translate(x,y);
+	ctx.rotate(player.angle+Math.PI/2);
+	ctx.beginPath();
+	ctx.moveTo(-player.width/2,player.height/2);
+	ctx.lineTo(0,-player.height/2);
+	ctx.lineTo(player.width/2,player.height/2);
+	ctx.lineTo(0,player.height/4);
+	ctx.lineTo(-player.width/2,player.height/2);
+	ctx.stroke();
+	ctx.closePath();
+	ctx.translate(-x,-y);
+	ctx.setTransform(1,0,0,1,0,0);
+}
+
 class Space {
 	constructor() {
+		this.width = canv.width;
+		this.height = canv.height;
 		this.asteroids = [];
+		this.lasers = [];
 		this.score = 0;
-		this.dampen = 0.95;
+	}
+
+	update() {
+		this.lasers.forEach((l) => l.update());
+		if(this.lasers.length > 30) { this.lasers.unshift() }
+		this.asteroids.forEach((a) => a.update());
 	}
 
 	show() {
 		ctx.fillStyle = "black";
-		ctx.fillRect(0,0,canv.width,canv.height);
+		ctx.fillRect(0,0,this.width,this.height);
 
 		this.asteroids.forEach((a) => a.show());
+		this.lasers.forEach((l) => l.show());
 	}
+}
+
+class Laser {
+	constructor(x,y,a) {
+		this.pos = {
+			x: x+player.r*Math.cos(a),
+			y: y+player.r*Math.sin(a)
+		};
+		this.angle = a;
+		this.size = 10;
+	}
+
+	update() {
+		const speed = 3;
+		this.pos.x += speed*Math.cos(this.angle);
+		this.pos.y += speed*Math.sin(this.angle);
+	}
+
+	show() {
+		ctx.translate(this.pos.x,this.pos.y);
+		ctx.rotate(this.angle+Math.PI/2);
+		ctx.beginPath();
+		ctx.moveTo(0,this.size/2);
+		ctx.lineTo(0,-this.size/2);
+		ctx.stroke();
+		ctx.closePath();
+		ctx.translate(-this.pos.x,-this.pos.y);
+		ctx.setTransform(1,0,0,1,0,0);
+	}
+}
+
+class Asteroid {
+	constructor() {
+		this.pos = {
+			x: Math.random()*space.width,
+			y: Math.random()*space.height
+		};
+		this.r = Math.random()*25+5;
+		this.vel = {
+			x:0,
+			y:0
+		};
+		this.angle = Math.random()*2*Math.PI;
+	}
+
+	show() {
+		ctx.translate(this.pos.x,this.pos.y);
+		// ctx.rotate(this.angle+Math.PI/2);
+		ctx.beginPath();
+		ctx.arc(0,0,this.r,0,2*Math.PI);
+		ctx.stroke();
+		ctx.closePath();
+		ctx.translate(-this.pos.x,-this.pos.y);
+		ctx.setTransform(1,0,0,1,0,0);
+	}
+}
+
+function sq(n) {
+	return Math.pow(n,2);
 }
 
 function main() {
 	space.show();
+	space.update();
 	player.show();
+	player.update();
+
 }
 
 function handle_key_down(evt) {
 	switch(evt.code) {
 		case 'ArrowUp':
-			player.move(0);
+			player.thrusting = true;
 			break;
 		case 'ArrowRight':
-			player.move(1);
-			break;
-		case 'ArrowDown':
-			player.move(2);
+			player.turning = 1;
 			break;
 		case 'ArrowLeft':
-			player.move(3);
+			player.turning = -1;
 			break;
 		case 'Space':
-			player.shoot();
+			if(!player.shooting) {
+				space.lasers.push(new Laser(player.pos.x,player.pos.y,player.angle));
+				player.shooting = true;
+			};
 			break;
 		default:
 			console.log("invalid key press");
@@ -98,5 +244,21 @@ function handle_key_down(evt) {
 }
 
 function handle_key_up(evt) {
-	// console.log(evt,"key up");
+	switch(evt.code) {
+		case 'ArrowUp':
+			player.thrusting = false;
+			break;
+		case 'ArrowRight':
+			player.turning = 0;
+			break;
+		case 'ArrowLeft':
+			player.turning = 0;
+			break;
+		case 'Space':
+			player.shooting = false;
+			break;
+		default:
+			console.log("other up key");
+			break;
+	}
 }
