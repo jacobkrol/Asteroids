@@ -142,10 +142,13 @@ class Space {
 
 	update() {
 		this.lasers.forEach((l) => {
+			//update laser positions
 			l.update();
+
+			//react to laser hitting an asteroid
 			this.asteroids.forEach((a) => {
 				if(l.hit(a)) {
-					if(a.r > 8) {
+					if(a.r > 10) {
 						for(let i=0; i<Math.random()*3+1; i++) {
 							const r = a.r*(Math.random()*0.55+0.2);
 							this.asteroids.push(new Asteroid(a.pos.x,a.pos.y,r));
@@ -153,21 +156,45 @@ class Space {
 					}
 					a.hit = true;
 					l.used = true;
-					console.log(this.asteroids.indexOf(a));
 				}
 			});
+
+			//update dead lasers and asteroids between loops
 			this.lasers = this.lasers.slice().filter((l) => !l.used);
 			this.asteroids = this.asteroids.slice().filter((a) => !a.hit);
 		});
-		if(this.lasers.length > 30) { this.lasers.unshift() }
-		this.asteroids.forEach((a) => {
-			a.update();
-			if(a.hit) {
 
-			}
+		//remove objects that have left the map
+		let playerNose = {
+			x: player.pos.x+player.height/2*Math.cos(player.angle),
+			y: player.pos.y+player.height/2*Math.sin(player.angle)
+		};
+		playerNose.x = playerNose.x < 0 ? playerNose.x+space.width : playerNose.x;
+		playerNose.x = playerNose.x > space.width ? playerNose.x-space.width : playerNose.x;
+		playerNose.y = playerNose.y < 0 ? playerNose.y+space.height : playerNose.y;
+		playerNose.y = playerNose.y > space.height ? playerNose.y-space.height : playerNose.y;
+		console.log(playerNose.x,playerNose.y);
+		this.lasers = this.lasers.slice().filter((l) => {
+			console.log(playerNose.x < l.size);
+			return ((l.pos.x < space.width+l.size &&
+					 l.pos.x > -l.size &&
+					 l.pos.y < space.height+l.size &&
+					 l.pos.y > -l.size) ||
+				 	(playerNose.x < l.size ||
+					 playerNose.x > space.width-l.size ||
+				 	 playerNose.y < l.size ||
+				 	 playerNose.y > space.width-l.size)
+				 	);
 		});
-		this.asteroids = this.asteroids.filter((a) => !a.hit);
-		if(Math.random() < 0.01) {
+		this.asteroids = this.asteroids.slice().filter((a) => {
+			return a.pos.x < 1.5*space.width && a.pos.x > -0.5*space.width && a.pos.y < 1.5*space.height && a.pos.y > -0.5*space.height;
+		});
+
+		//update asteroid positions
+		this.asteroids.forEach((a) => a.update());
+
+		//push new asteroids at a random rate
+		if(Math.random() < 0.015) {
 			this.asteroids.push(new Asteroid());
 		}
 	}
