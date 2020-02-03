@@ -14,7 +14,10 @@ function setup() {
 	player = new Player();
 	player.r = Math.max(player.width,player.height)/2;
 	space = new Space();
+
 }
+
+
 
 class Player {
 	constructor() {
@@ -56,8 +59,11 @@ class Player {
 			}
 		}
 
+		//update the ship's position
 		this.pos.x += this.vel.x;
 		this.pos.y += this.vel.y;
+
+		//update which sides need copies drawn
 		this.copies = [];
 		if(this.pos.y >= space.height-this.r) {
 			this.pos.y -= space.height;
@@ -83,6 +89,36 @@ class Player {
 				this.copies.push(3);
 			}
 		}
+
+		//check for asteroid collisions
+		space.asteroids.forEach((a) => {
+			if(this.hit(a)) {
+				destroy_player();
+			}
+		});
+	}
+
+	hit(a) {
+		const d = Math.sqrt(sq(this.pos.x - a.pos.x) + sq(this.pos.y - a.pos.y));
+		return d < Math.min(this.height,this.width)/2+a.r;
+	}
+
+	destroy() {
+		ctx.fillStyle = "red";
+		ctx.strokeStyle = "lime";
+		ctx.translate(this.pos.x,this.pos.y);
+		ctx.rotate(this.angle+Math.PI/2);
+		ctx.beginPath();
+		ctx.moveTo(-this.width/2,this.height/2);
+		ctx.lineTo(0,-this.height/2);
+		ctx.lineTo(this.width/2,this.height/2);
+		ctx.lineTo(0,this.height/4);
+		ctx.lineTo(-this.width/2,this.height/2);
+		ctx.fill();
+		ctx.closePath();
+		ctx.translate(-this.pos.x,-this.pos.y);
+		ctx.setTransform(1,0,0,1,0,0);
+		// clearInterval(game);
 	}
 
 	show() {
@@ -112,8 +148,51 @@ class Player {
 	}
 
 	shoot() {
-		console.log("pew");
+		// console.log("pew");
 	}
+}
+
+function destroy_player() {
+	destroyPlayer = new Promise((resolve,reject) => {
+		//clear old ship
+		space.show();
+		resolve(true);
+	}).then((result) => {
+
+		//translate canvas context
+		ctx.translate(player.pos.x,player.pos.y);
+
+		//fill ship
+		ctx.fillStyle = "red";
+		ctx.rotate(player.angle+Math.PI/2);
+		ctx.beginPath();
+		ctx.moveTo(-player.width/2,player.height/2);
+		ctx.lineTo(0,-player.height/2);
+		ctx.lineTo(player.width/2,player.height/2);
+		ctx.lineTo(0,player.height/4);
+		ctx.lineTo(-player.width/2,player.height/2);
+		ctx.fill();
+		ctx.closePath();
+
+		//stroke ship
+		ctx.strokeStyle = "darkred";
+		ctx.lineWidth = "2";
+		ctx.beginPath();
+		ctx.moveTo(-player.width/2,player.height/2);
+		ctx.lineTo(0,-player.height/2);
+		ctx.lineTo(player.width/2,player.height/2);
+		ctx.lineTo(0,player.height/4);
+		ctx.lineTo(-player.width/2,player.height/2);
+		ctx.stroke();
+		ctx.closePath();
+
+		//reset canvas context transformation
+		ctx.translate(-player.pos.x,-player.pos.y);
+		ctx.setTransform(1,0,0,1,0,0);
+		return true;
+	}).then((result) => {
+		clearInterval(game);
+	});
 }
 
 function show_player_at(x,y) {
@@ -150,7 +229,7 @@ class Space {
 				if(l.hit(a)) {
 					if(a.r > 10) {
 						for(let i=0; i<Math.random()*3+1; i++) {
-							const r = a.r*(Math.random()*0.55+0.2);
+							const r = a.r*(rand(0.2,0.75));
 							this.asteroids.push(new Asteroid(a.pos.x,a.pos.y,r));
 						}
 					}
@@ -173,9 +252,9 @@ class Space {
 		playerNose.x = playerNose.x > space.width ? playerNose.x-space.width : playerNose.x;
 		playerNose.y = playerNose.y < 0 ? playerNose.y+space.height : playerNose.y;
 		playerNose.y = playerNose.y > space.height ? playerNose.y-space.height : playerNose.y;
-		console.log(playerNose.x,playerNose.y);
+		// console.log(playerNose.x,playerNose.y);
 		this.lasers = this.lasers.slice().filter((l) => {
-			console.log(playerNose.x < l.size);
+			// console.log(playerNose.x < l.size);
 			return ((l.pos.x < space.width+l.size &&
 					 l.pos.x > -l.size &&
 					 l.pos.y < space.height+l.size &&
@@ -194,7 +273,7 @@ class Space {
 		this.asteroids.forEach((a) => a.update());
 
 		//push new asteroids at a random rate
-		if(Math.random() < 0.015) {
+		if(Math.random() < 0.03) {
 			this.asteroids.push(new Asteroid());
 		}
 	}
@@ -243,33 +322,61 @@ class Laser {
 	}
 }
 
+function getAsteroidVertices(a) {
+	let vertices = Array.from(Array(Math.floor(rand(6,11))), () => [null,null]);
+	const wedge = 2*Math.PI / vertices.length;
+		  buffer = 0.2;
+	for(let i=0; i<vertices.length; i++) {
+		const angle = wedge * i,
+			  shift = rand(-a.r*buffer,a.r*buffer);
+		vertices[i][0] = (a.r+shift)*Math.cos(angle);
+		vertices[i][1] = (a.r+shift)*Math.sin(angle);
+	}
+	return vertices;
+}
+
+function setBehindBorder(distance,margin) {
+	return rand(1) < 0.5 ? -margin : distance+margin;
+}
+
 class Asteroid {
+
+	//define object parameters
 	constructor(_x,_y,_r) {
 		this.pos = {
-			x: _x ||Math.random()*space.width,
-			y: _y || Math.random()*space.height
+			x: _x || setBehindBorder(space.width,35),
+			y: _y || setBehindBorder(space.height,35)
 		};
-		this.r = _r || Math.random()*25+8;
-		this.speed = Math.random()*1+0.1;
-		this.angle = Math.random()*2*Math.PI;
+		this.r = _r || rand(8,32);
+		this.vertices = getAsteroidVertices(this);
+		this.speed = rand(0.1,1.2);
+		this.angle = rand(2*Math.PI);
 		this.hit = false;
 	}
 
+	//update position from speed and angle
 	update() {
 		this.pos.x += this.speed * Math.cos(this.angle);
 		this.pos.y += this.speed * Math.sin(this.angle);
 	}
 
+	//flag asteroid as hit for removal from Space array
 	explode() {
 		this.hit = true;
 	}
 
+	//display to the canvas
 	show() {
 		ctx.strokeStyle = this.hit ? "red" : "white";
 		ctx.translate(this.pos.x,this.pos.y);
 		// ctx.rotate(this.angle+Math.PI/2);
 		ctx.beginPath();
-		ctx.arc(0,0,this.r,0,2*Math.PI);
+		//ctx.arc(0,0,this.r,0,2*Math.PI);
+		ctx.moveTo(this.vertices[0][0],this.vertices[0][1]);
+		for(let i=1; i<this.vertices.length; i++) {
+			ctx.lineTo(this.vertices[i][0],this.vertices[i][1]);
+		}
+		ctx.lineTo(this.vertices[0][0],this.vertices[0][1]);
 		ctx.stroke();
 		ctx.closePath();
 		ctx.translate(-this.pos.x,-this.pos.y);
@@ -277,43 +384,73 @@ class Asteroid {
 	}
 }
 
+//input n
+//output n^2
 function sq(n) {
 	return Math.pow(n,2);
 }
 
+//input a OR a,b
+//output random float, 0 -> a OR a -> b
+function rand(_a,_b) {
+	let a = _a || undefined,
+		b = _b || 0;
+	return Math.random()*(Math.max(a,b)-Math.min(a,b)) + Math.min(a,b);
+}
+
+//main game loop
 function main() {
-	space.show();
+
+	//update positions
 	space.update();
-	player.show();
 	player.update();
+
+	//display updates
+	space.show();
+	player.show();
+
 
 }
 
 function handle_key_down(evt) {
 	switch(evt.code) {
+
+		//flag player as thrusting
 		case 'ArrowUp':
 			player.thrusting = true;
 			break;
+
+		//flag player as turning clockwise
 		case 'ArrowRight':
 			player.turning = 1;
 			break;
+
+		//flag player as turning counterclockwise
 		case 'ArrowLeft':
 			player.turning = -1;
 			break;
+
+		//push laser to Laser array and flag to await key up
 		case 'Space':
 			if(!player.shooting) {
 				space.lasers.push(new Laser(player.pos.x,player.pos.y,player.angle));
 				player.shooting = true;
 			};
 			break;
+
+		//catch default and print to console
 		default:
-			console.log("invalid key press");
+			// console.log("invalid key press");
 			break;
 	}
 }
 
 function handle_key_up(evt) {
 	switch(evt.code) {
+
+		//in all cases ...
+		//cancel respective player flag
+
 		case 'ArrowUp':
 			player.thrusting = false;
 			break;
@@ -327,7 +464,7 @@ function handle_key_up(evt) {
 			player.shooting = false;
 			break;
 		default:
-			console.log("other up key");
+			// console.log("other up key");
 			break;
 	}
 }
