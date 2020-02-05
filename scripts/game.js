@@ -1,8 +1,8 @@
 window.onload = function() {
 	canv = document.getElementById('gc');
 	ctx = canv.getContext('2d');
-	canv.width = Math.min(window.innerHeight,window.innerWidth)-30;
-	canv.height = Math.min(window.innerHeight,window.innerWidth)-30;
+	canv.width = window.innerWidth-21;
+	canv.height = window.innerHeight-21;
 	document.addEventListener('keydown', handle_key_down);
 	document.addEventListener('keyup', handle_key_up);
 	const fps = 50;
@@ -103,24 +103,6 @@ class Player {
 		return d < Math.min(this.height,this.width)/2+a.r;
 	}
 
-	destroy() {
-		ctx.fillStyle = "red";
-		ctx.strokeStyle = "lime";
-		ctx.translate(this.pos.x,this.pos.y);
-		ctx.rotate(this.angle+Math.PI/2);
-		ctx.beginPath();
-		ctx.moveTo(-this.width/2,this.height/2);
-		ctx.lineTo(0,-this.height/2);
-		ctx.lineTo(this.width/2,this.height/2);
-		ctx.lineTo(0,this.height/4);
-		ctx.lineTo(-this.width/2,this.height/2);
-		ctx.fill();
-		ctx.closePath();
-		ctx.translate(-this.pos.x,-this.pos.y);
-		ctx.setTransform(1,0,0,1,0,0);
-		// clearInterval(game);
-	}
-
 	show() {
 		ctx.strokeStyle = "white";
 		ctx.lineWidth = "2";
@@ -160,6 +142,7 @@ function destroy_player() {
 	}).then((result) => {
 
 		//translate canvas context
+		ctx.scale(space.scale.x,space.scale.y);
 		ctx.translate(player.pos.x,player.pos.y);
 
 		//fill ship
@@ -187,7 +170,6 @@ function destroy_player() {
 		ctx.closePath();
 
 		//reset canvas context transformation
-		ctx.translate(-player.pos.x,-player.pos.y);
 		ctx.setTransform(1,0,0,1,0,0);
 		return true;
 	}).then((result) => {
@@ -196,6 +178,7 @@ function destroy_player() {
 }
 
 function show_player_at(x,y) {
+	ctx.scale(space.scale.x,space.scale.y);
 	ctx.translate(x,y);
 	ctx.rotate(player.angle+Math.PI/2);
 	ctx.beginPath();
@@ -206,14 +189,18 @@ function show_player_at(x,y) {
 	ctx.lineTo(-player.width/2,player.height/2);
 	ctx.stroke();
 	ctx.closePath();
-	ctx.translate(-x,-y);
 	ctx.setTransform(1,0,0,1,0,0);
 }
 
 class Space {
 	constructor() {
-		this.width = canv.width;
-		this.height = canv.height;
+		const minSide = 500;
+		this.width = canv.height > canv.width ? minSide : minSide*canv.width/canv.height;
+		this.height = canv.height > canv.width ? minSide*canv.height/canv.width : minSide;
+		this.scale = {
+			x: canv.height > canv.width ? window.innerWidth/minSide : window.innerWidth/(minSide*canv.width/canv.height),
+			y: canv.height > canv.width ? window.innerHeight/(minSide*canv.height/canv.width) : window.innerHeight/minSide
+		};
 		this.asteroids = [];
 		this.lasers = [];
 		this.score = 0;
@@ -265,22 +252,31 @@ class Space {
 				 	 playerNose.y > space.width-l.size)
 				 	);
 		});
-		this.asteroids = this.asteroids.slice().filter((a) => {
-			return a.pos.x < 1.5*space.width && a.pos.x > -0.5*space.width && a.pos.y < 1.5*space.height && a.pos.y > -0.5*space.height;
+
+		//update asteroid visibility and positions
+		this.asteroids.forEach((a) => {
+			a.update();
+			if(a.visible()) {
+				a.lastVisible = performance.now();
+			}
 		});
 
-		//update asteroid positions
-		this.asteroids.forEach((a) => a.update());
+		//remove asteroids off screen for too long
+		const timeLimit = 5000; // 2 seconds
+		this.asteroids = this.asteroids.slice().filter((a) => {
+			return (performance.now() - a.lastVisible) < timeLimit;
+		});
 
 		//push new asteroids at a random rate
 		if(Math.random() < 0.03) {
+			console.log("new asteroid");
 			this.asteroids.push(new Asteroid());
 		}
 	}
 
 	show() {
 		ctx.fillStyle = "black";
-		ctx.fillRect(0,0,this.width,this.height);
+		ctx.fillRect(0,0,this.width*this.scale.x,this.height*this.scale.y);
 
 		this.asteroids.forEach((a) => a.show());
 		this.lasers.forEach((l) => l.show());
@@ -310,6 +306,7 @@ class Laser {
 	}
 
 	show() {
+		ctx.scale(space.scale.x,space.scale.y);
 		ctx.translate(this.pos.x,this.pos.y);
 		ctx.rotate(this.angle+Math.PI/2);
 		ctx.beginPath();
@@ -352,6 +349,7 @@ class Asteroid {
 		this.speed = rand(0.1,1.2);
 		this.angle = rand(2*Math.PI);
 		this.hit = false;
+		this.lastVisible = performance.now();
 	}
 
 	//update position from speed and angle
@@ -365,9 +363,18 @@ class Asteroid {
 		this.hit = true;
 	}
 
+	//check if within space boundaries
+	visible() {
+		return (this.pos.x > -this.r &&
+				this.pos.x < space.width+this.r &&
+				this.pos.y > -this.r &&
+				this.pos.y < space.height+this.r);
+	}
+
 	//display to the canvas
 	show() {
 		ctx.strokeStyle = this.hit ? "red" : "white";
+		ctx.scale(space.scale.x,space.scale.y);
 		ctx.translate(this.pos.x,this.pos.y);
 		// ctx.rotate(this.angle+Math.PI/2);
 		ctx.beginPath();
