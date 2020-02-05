@@ -5,16 +5,15 @@ window.onload = function() {
 	canv.height = window.innerHeight-21;
 	document.addEventListener('keydown', handle_key_down);
 	document.addEventListener('keyup', handle_key_up);
-	const fps = 50;
 	setup();
-	game = setInterval(main, 1000/fps);
 }
 
 function setup() {
 	player = new Player();
 	player.r = Math.max(player.width,player.height)/2;
 	space = new Space();
-
+	const fps = 50;
+	game = setInterval(main, 1000/fps);
 }
 
 
@@ -39,6 +38,7 @@ class Player {
 		this.turning = 0;
 		this.thrusting = false;
 		this.shooting = false;
+		this.dead = false;
 	}
 
 	update() {
@@ -173,6 +173,11 @@ function destroy_player() {
 		ctx.setTransform(1,0,0,1,0,0);
 		return true;
 	}).then((result) => {
+
+		//set player to dead
+		player.dead = true;
+		
+		//clear the game interval
 		clearInterval(game);
 	});
 }
@@ -469,6 +474,7 @@ function handle_key_up(evt) {
 			break;
 		case 'Space':
 			player.shooting = false;
+			if(player.dead) setup();
 			break;
 		default:
 			// console.log("other up key");
